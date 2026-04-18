@@ -9,11 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-var dbPath = Environment.GetEnvironmentVariable("DB_PATH") 
-             ?? Path.Combine(AppContext.BaseDirectory, "flashcards.db");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+                    ?? "Data Source=flashcards.db";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+    options.UseSqlite(connectionString));
 
 builder.Services.AddScoped<CardService>();
 builder.Services.AddScoped<StatService>();

@@ -6,6 +6,16 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/data
+      - ./data:/app/data
+    user: "${PUID:-1000}:${PGID:-1000}"
     environment:
-      - DB_PATH=/data/flashcards.db
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/flashcards.db
+      - ASPNETCORE_ENVIRONMENT=Production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
