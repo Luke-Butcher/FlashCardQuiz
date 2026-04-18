@@ -21,17 +21,28 @@ builder.Services.AddScoped<QuizService>();
 
 var app = builder.Build();
 
+// Ensure database is created and migrated on startup
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    // Disable HSTS and HTTPS Redirection for NAS/Docker compatibility 
+    // unless you are using a reverse proxy with a certificate.
+    // app.UseHsts();
+}
+else
+{
+    app.UseHttpsRedirection();
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
-
+app.UseStaticFiles();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
