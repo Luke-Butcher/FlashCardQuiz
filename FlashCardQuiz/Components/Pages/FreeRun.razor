@@ -1,0 +1,149 @@
+@page "/freerun"
+@page "/freerun/{QuizId:int}"
+@inject CardService CardService
+@inject StatService StatService
+@inject QuizService QuizService
+@rendermode InteractiveServer
+
+<h3>@(quiz != null ? $"Quiz: {quiz.Name}" : "Free Run")</h3>
+
+@if (cards == null)
+{
+    <p>Loading...</p>
+}
+else if (!cards.Any())
+{
+    <p>No cards available. Please <a href="/cards">add some cards</a> first.</p>
+}
+else if (isFinished)
+{
+    <div class="card">
+        <div class="card-body text-center">
+            <h4>Session Summary</h4>
+            <p>Correct: @correctCount</p>
+            <p>Wrong: @wrongCount</p>
+            <p>Skipped: @skippedCount</p>
+            <button class="btn btn-primary" @onclick="Restart">Restart Session</button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="mb-3 text-center">
+        <p>Card @(currentIndex + 1) of @cards.Count</p>
+    </div>
+
+    <FlashCard @ref="flashCard" Front="@currentCard.Front" Back="@currentCard.Back" />
+
+    <div class="mt-4 d-flex justify-content-center gap-3">
+        <button class="btn btn-success" @onclick="MarkCorrect">Correct</button>
+        <button class="btn btn-danger" @onclick="MarkWrong">Wrong</button>
+        <button class="btn btn-secondary" @onclick="MarkSkipped">Skip</button>
+    </div>
+}
+
+@code {
+    [Parameter] public int? QuizId { get; set; }
+
+    private List<Card>? cards;
+    private Quiz? quiz;
+    private int currentIndex = 0;
+    private bool isFinished = false;
+    private FlashCard? flashCard;
+
+    private int correctCount = 0;
+    private int wrongCount = 0;
+    private int skippedCount = 0;
+
+    private Card currentCard => cards![currentIndex];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (QuizId.HasValue)
+        {
+            var quizzes = await QuizService.GetQuizzesAsync();
+            quiz = quizzes.FirstOrDefault(q => q.Id == QuizId.Value);
+            if (quiz != null)
+            {
+                var allCards = await CardService.GetAllCardsAsync();
+                var cardIds = quiz.QuizCards.Select(qc => qc.CardId).ToList();
+                cards = allCards.Where(c => cardIds.Contains(c.Id)).ToList();
+            }
+        }
+        else
+        {
+            cards = await CardService.GetAllCardsAsync();
+        }
+
+        // Shuffle cards
+        if (cards != null && cards.Any())
+        {
+            var rng = new Random();
+            cards = cards.OrderBy(a => rng.Next()).ToList();
+        }
+    }
+
+    private async Task MarkCorrect()
+    {
+        await StatService.RecordCorrectAsync(currentCard.Id);
+        correctCount++;
+        await NextCard();
+    }
+
+    private async Task MarkWrong()
+    {
+        await StatService.RecordWrongAsync(currentCard.Id);
+        wrongCount++;
+        await NextCard();
+    }
+
+    private async Task MarkSkipped()
+    {
+        await StatService.RecordSkippedAsync(currentCard.Id);
+        skippedCount++;
+        await NextCard();
+    }
+
+    private async Task NextCard()
+    {
+        if (currentIndex < cards!.Count - 1)
+        {
+            currentIndex++;
+            flashCard?.Reset();
+        }
+        else
+        {
+            isFinished = true;
+            if (QuizId.HasValue)
+            {
+                await SaveQuizRun();
+            }
+        }
+    }
+
+    private async Task SaveQuizRun()
+    {
+        var run = new QuizRun
+        {
+            QuizId = QuizId!.Value,
+            CompletedAt = DateTime.UtcNow,
+            Correct = correctCount,
+            Wrong = wrongCount,
+            Skipped = skippedCount,
+            TotalCards = cards!.Count
+        };
+        await QuizService.SaveRunAsync(run);
+    }
+
+    private void Restart()
+    {
+        currentIndex = 0;
+        correctCount = 0;
+        wrongCount = 0;
+        skippedCount = 0;
+        isFinished = false;
+        
+        var rng = new Random();
+        cards = cards?.OrderBy(a => rng.Next()).ToList();
+    }
+}

@@ -1,0 +1,63 @@
+@page "/quizbuilder"
+@inject CardService CardService
+@inject QuizService QuizService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<h3>Build a Quiz</h3>
+
+<div class="card">
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">Quiz Name</label>
+            <input type="text" @bind="quizName" class="form-control" placeholder="E.g., Midterm Prep" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Number of Cards (Total Available: @(allCards?.Count ?? 0))</label>
+            <input type="number" @bind="cardCount" class="form-control" min="1" max="@(allCards?.Count ?? 1)" />
+        </div>
+        <button class="btn btn-primary" @onclick="BuildQuiz" disabled="@(!CanBuild)">Save Quiz</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert alert-success mt-3">@statusMessage</div>
+}
+
+@code {
+    private List<Card>? allCards;
+    private string quizName = "";
+    private int cardCount = 5;
+    private string statusMessage = "";
+
+    private bool CanBuild => !string.IsNullOrWhiteSpace(quizName) && cardCount > 0 && allCards?.Count >= cardCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allCards = await CardService.GetAllCardsAsync();
+    }
+
+    private async Task BuildQuiz()
+    {
+        if (allCards == null || allCards.Count < cardCount) return;
+
+        var rng = new Random();
+        var selectedCards = allCards.OrderBy(x => rng.Next()).Take(cardCount).ToList();
+
+        var quiz = new Quiz
+        {
+            Name = quizName,
+            CreatedAt = DateTime.UtcNow,
+            QuizCards = selectedCards.Select(c => new QuizCard { CardId = c.Id }).ToList()
+        };
+
+        await QuizService.SaveQuizAsync(quiz);
+        statusMessage = "Quiz saved successfully!";
+        quizName = "";
+        
+        // Wait a moment then navigate
+        await Task.Delay(1500);
+        NavigationManager.NavigateTo("/savedquizzes");
+    }
+}

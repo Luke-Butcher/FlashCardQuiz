@@ -1,10 +1,20 @@
 using FlashCardQuiz.Components;
+using FlashCardQuiz.Data;
+using FlashCardQuiz.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=flashcards.db"));
+
+builder.Services.AddScoped<CardService>();
+builder.Services.AddScoped<StatService>();
+builder.Services.AddScoped<QuizService>();
 
 var app = builder.Build();
 

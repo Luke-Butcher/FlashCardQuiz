@@ -1,0 +1,112 @@
+@page "/cards"
+@inject CardService CardService
+@rendermode InteractiveServer
+
+<h3>My Cards</h3>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Add New Card</h5>
+        <EditForm Model="newCard" OnValidSubmit="SaveCard">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">Front</label>
+                    <InputText @bind-Value="newCard.Front" class="form-control" placeholder="Question or term" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Back</label>
+                    <InputText @bind-Value="newCard.Back" class="form-control" placeholder="Answer or definition" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Save</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Import JSON</h5>
+        <div class="mb-3">
+            <textarea @bind="jsonImport" class="form-control" rows="3" placeholder='[{"Front": "Term", "Back": "Definition"}]'></textarea>
+        </div>
+        <button class="btn btn-secondary" @onclick="ImportJson">Parse and Import</button>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Front</th>
+            <th>Back</th>
+            <th>Stats (C/W/S)</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (cards == null)
+        {
+            <tr><td colspan="4">Loading...</td></tr>
+        }
+        else if (!cards.Any())
+        {
+            <tr><td colspan="4">No cards found.</td></tr>
+        }
+        else
+        {
+            @foreach (var card in cards)
+            {
+                <tr>
+                    <td>@card.Front</td>
+                    <td>@card.Back</td>
+                    <td>
+                        @card.CardStat?.Correct / @card.CardStat?.Wrong / @card.CardStat?.Skipped
+                    </td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteCard(card.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Card>? cards;
+    private Card newCard = new();
+    private string jsonImport = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCards();
+    }
+
+    private async Task LoadCards()
+    {
+        cards = await CardService.GetAllCardsAsync();
+    }
+
+    private async Task SaveCard()
+    {
+        if (string.IsNullOrWhiteSpace(newCard.Front) || string.IsNullOrWhiteSpace(newCard.Back)) return;
+        
+        await CardService.AddCardAsync(newCard);
+        newCard = new();
+        await LoadCards();
+    }
+
+    private async Task DeleteCard(int id)
+    {
+        await CardService.DeleteCardAsync(id);
+        await LoadCards();
+    }
+
+    private async Task ImportJson()
+    {
+        if (string.IsNullOrWhiteSpace(jsonImport)) return;
+        await CardService.ImportFromJsonAsync(jsonImport);
+        jsonImport = "";
+        await LoadCards();
+    }
+}
